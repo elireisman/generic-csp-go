@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/elireisman/generic-csp-go/pkg/csp"
 )
 
@@ -15,20 +16,30 @@ var (
 	Colors []Color
 
 	// CSP constraints
-	Constraints []Border
+	Constraints []Border[Province, Color]
 )
 
-type Border struct {
-	csp.Constraint[Province]
+// WTF! This should work fine, but results in:
+// `cmd/map_coloring.go:112:25: cannot use border (variable of type Border[Province, Color]) as type csp.Constraint[Province, Color] in argument to problem.AddConstraint`
+//
+// References:
+// https://github.com/golang/go/issues/44689
+// https://stackoverflow.com/questions/66118867/go-generics-is-it-possible-to-embed-generic-structs
+type Border[V, D comparable] struct {
+	csp.Constraint[V, D]
 }
 
-func NewBorder(sideOne Province, sideTwo Province) Border {
-	return Border{Variables: []Province{sideOne, sideTwo}}
+func NewBorder(sideOne, sideTwo Province) Border[Province, Color] {
+	return Border[Province, Color]{
+		csp.Constraint[Province, Color]{
+			Variables: []Province{sideOne, sideTwo},
+		},
+	}
 }
 
 // constraint: Ensure pair of province borders represented here
 // are not assigned the same color in the candidate solution
-func (b Border) Satisfied(candidate map[Province]Color) bool {
+func (b Border[Province, Color]) Satisfied(candidate map[Province]Color) bool {
 	colorP1, foundP1 := candidate[b.Variables[0]]
 	colorP2, foundP2 := candidate[b.Variables[1]]
 
@@ -54,7 +65,7 @@ func init() {
 		"Manitoba",
 		"Ontario",
 		"Quebec",
-		"Newfoundland an Laborador",
+		"Newfoundland and Laborador",
 		"New Brunswick",
 		"Nova Scotia",
 		"Prince Edward Island",
@@ -67,7 +78,7 @@ func init() {
 		"Green",
 	}
 
-	Constraints = []Border{
+	Constraints = []Border[Province, Color]{
 		NewBorder("Yukon", "British Columbia"),
 		NewBorder("Yukon", "Northwest Territories"),
 		NewBorder("British Columbia", "Alberta"),
@@ -91,11 +102,11 @@ func init() {
 	}
 }
 
-// TODO(eli): model the map-coloring problem using CSP framework
+// model the map-coloring problem using CSP framework + Go generics
 func main() {
 	// assemble valid variable domains
 	var domains map[Province][]Color
-	for p := range Canada {
+	for _, p := range Canada {
 		domains[p] = Colors
 	}
 	// init empty solution to begin search through problem space
@@ -107,7 +118,8 @@ func main() {
 		problem.AddConstraint(border)
 	}
 
-	if result := problem.Search(candidate); result != nil {
+	// find ONE possible solution, and display it, if it exists
+	if result := problem.Solve(candidate); result != nil {
 		fmt.Println("Solution:")
 		for p, c := range result {
 			fmt.Printf("%s => %s\n", p, c)
