@@ -1,78 +1,70 @@
 package csp
 
-type Variable interface {
-	comparable
-}
-
-type Domain interface {
-	comparable
-}
-
-// A CSP is state and a framework that models a single instance
+// A Problem is state and a framework that models a single instance
 // of a constraint-satisfaction problem. Once instantiated and
-// populated, this framework can produce a valid solution if
-// one exists.
-type CSP[V Variable, D Domain] struct {
+// populated, this framework can produce a (not every!) valid
+// solution, if one exists.
+type Problem[V, D comparable] struct {
 	Variables   []V
 	Domains     map[V][]D
-	Constraints map[V][]Constraint
+	Constraints map[V][]Constraint[V, D]
 }
 
-func New(variables []V, domains map[V][]D) CSP {
-	return CSP{
+func New[V, D comparable](variables []V, domains map[V][]D) Problem[V, D] {
+	return Problem[V, D]{
 		Variables:   variables,
 		Domains:     domains,
-		Constraints: map[V][]Constraint{},
+		Constraints: map[V][]Constraint[V, D]{},
 	}
 }
 
 // apply another constraint to the problem space
-func (c CSP) AddConstraint(constraint Constraint) {
+func (p Problem[V, D]) AddConstraint(constraint Constraint[V, D]) {
 	for _, constraintVar := range constraint.Variables {
 		// ensure each constraint var is part of the problem space
 		found := false
-		for _, cspVar := range c.Variables {
+		for _, cspVar := range p.Variables {
 			if cspVar == constraintVar {
 				found = true
 				break
 			}
 		}
 		if !found {
-			panic("error: constraint variable %+v not found in CSP")
+			panic("error: constraint variable %+v not found in Problem")
 		}
 
 		// store valid constraint
-		c.Constraints[cspVar] = append(c.Constraints[cspVar], constraint)
+		p.Constraints[constraintVar] = append(p.Constraints[constraintVar], constraint)
 	}
 }
 
 // backtracking recursive search through the problem space, attempting
 // to fit a solution by testing one variable at a time through all
 // related constraints until all variables are assigned to a candidate
-// solution, meaning a complete and consistent solution has been found.
-func (c CSP) Search(assignment map[V]D) map[V]D {
+// solution, meaning a complete, valid solution has been found.
+func (p Problem[V, D]) Solve(assignment map[V]D) map[V]D {
 	// base case: all variables are assigned, a solution has been found
-	if len(assignment) == len(c.Variables) {
+	if len(assignment) == len(p.Variables) {
 		return assignment
 	}
 
 	// enumerate all currently-unassigned variables
 	var unassigned []V
-	for v := range c.Variables {
+	for _, v := range p.Variables {
 		if _, found := assignment[v]; !found {
 			unassigned = append(unassigned, v)
 		}
 	}
 
-	first := unassigned[0]
-	for _, domains := range c.Domains[first] {
+	next := unassigned[0]
+	for _, domains := range p.Domains[next] {
 		// create a new candidate solution including the (novel)
-		// first unassigned value from the input assignment
-		candidate = dup(assignment)
-		candidate[first] = domains
+		// next unassigned value from the input assignment
+		candidate := dup(assignment)
+		candidate[next] = domains
 		// test if this augmented candidate assignment is still consistent
-		if c.consistent(first, candidate) {
-			result := c.Search(candidate)
+		if p.consistent(next, candidate) {
+			result := p.Solve(candidate)
 			if result != nil {
 				return result
 			}
@@ -84,8 +76,8 @@ func (c CSP) Search(assignment map[V]D) map[V]D {
 
 // determine if this variable and assignment satisfy the
 // constraints applied to the problem space
-func (c CSP) consistent(variable V, assignment map[V]D) bool {
-	for _, constraint := range c.Constraints[variable] {
+func (p Problem[V, D]) consistent(variable V, assignment map[V]D) bool {
+	for _, constraint := range p.Constraints[variable] {
 		if !constraint.Satisfied(assignment) {
 			return false
 		}
@@ -94,8 +86,8 @@ func (c CSP) consistent(variable V, assignment map[V]D) bool {
 	return true
 }
 
-// utility: copy the current assignment into a new map
-func dup(currentAssignment map[V]D) map[V]D {
+// utility: copy the current candidate solution into a new map
+func dup[V, D comparable](assignment map[V]D) map[V]D {
 	out := make(map[V]D, len(assignment))
 
 	for k, v := range assignment {
