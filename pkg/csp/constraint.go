@@ -14,10 +14,9 @@ type Constraint[V Variable, D Domain] struct {
 	Variables []V
 }
 
-func NewConstraint(variables []V) Constraint {
-	return Constraint{Variables: variables}
-}
-
-func (c Constraint) Satisfied(assignment map[V]D) bool {
+// check if this iteration's candidate solution (set of assingments
+// of legal variables to a single legal domain value each) violates
+// this constraint on the problem space or not.
+func (c Constraint) Satisfied(candidate map[V]D) bool {
 	panic("Abstract method: implement me!")
 }
