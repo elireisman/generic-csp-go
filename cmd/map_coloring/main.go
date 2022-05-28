@@ -16,32 +16,20 @@ var (
 	Colors []Color
 
 	// CSP constraints
-	Constraints []Border[Province, Color]
+	Constraints []csp.Constraint[Province]
 )
 
-// WTF! This should work fine, but results in:
-// `cmd/map_coloring.go:112:25: cannot use border (variable of type Border[Province, Color]) as type csp.Constraint[Province, Color] in argument to problem.AddConstraint`
-//
-// References:
-// https://github.com/golang/go/issues/44689
-// https://stackoverflow.com/questions/66118867/go-generics-is-it-possible-to-embed-generic-structs
-type Border[V, D comparable] struct {
-	csp.Constraint[V, D]
-}
-
-func NewBorder(sideOne, sideTwo Province) Border[Province, Color] {
-	return Border[Province, Color]{
-		csp.Constraint[Province, Color]{
-			Variables: []Province{sideOne, sideTwo},
-		},
+func NewBorder(us, them Province) csp.Constraint[Province] {
+	return csp.Constraint[Province]{
+		Variables: []Province{us, them},
 	}
 }
 
 // constraint: Ensure pair of province borders represented here
 // are not assigned the same color in the candidate solution
-func (b Border[Province, Color]) Satisfied(candidate map[Province]Color) bool {
-	colorP1, foundP1 := candidate[b.Variables[0]]
-	colorP2, foundP2 := candidate[b.Variables[1]]
+func Satisfied[V, D comparable](border csp.Constraint[V], candidate map[V]D) bool {
+	colorP1, foundP1 := candidate[border.Variables[0]]
+	colorP2, foundP2 := candidate[border.Variables[1]]
 
 	// if both provinces are not yet present in the candidate
 	// solution, then (for now) the constraint is satisfied
@@ -78,7 +66,7 @@ func init() {
 		"Green",
 	}
 
-	Constraints = []Border[Province, Color]{
+	Constraints = []csp.Constraint[Province]{
 		NewBorder("Yukon", "British Columbia"),
 		NewBorder("Yukon", "Northwest Territories"),
 		NewBorder("British Columbia", "Alberta"),
@@ -104,19 +92,21 @@ func init() {
 
 // model the map-coloring problem using CSP framework + Go generics
 func main() {
-	// assemble valid variable domains
-	var domains map[Province][]Color
+	// assemble mapping of variables to a set of possible
+	// values to search for a valid solution
+	domain := map[Province][]Color{}
 	for _, p := range Canada {
-		domains[p] = Colors
+		domain[p] = Colors
 	}
-	// init empty solution to begin search through problem space
-	candidate := map[Province]Color{}
 
 	// create CSP framework instance, populate
-	problem := csp.New(Canada, domains)
+	problem := csp.New(domain, Satisfied[Province, Color])
 	for _, border := range Constraints {
 		problem.AddConstraint(border)
 	}
+
+	// init empty solution to begin search through problem space
+	candidate := map[Province]Color{}
 
 	// find ONE possible solution, and display it, if it exists
 	if result := problem.Solve(candidate); result != nil {
