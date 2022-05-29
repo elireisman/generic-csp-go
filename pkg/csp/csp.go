@@ -3,34 +3,24 @@ package csp
 import "fmt"
 
 // Constraint models a single constraint to be satisfied
-// while attempting to find a valid solution for a Problem.
-// The constraint must be based on a valid variable declared
-// in the problem setup.
-//
-// A Constraint must be customized to fit the problem being solved:
-// 1. Write a function to construct properly-typed Constraint[V, D]s
-// 2. Implement a Satisfied method to pass to the Problem[V, D] class
+// while attempting to find a valid solution for a Problem
 type Constraint[V comparable] struct {
 	Variables []V
 }
 
-// check if this iteration's candidate solution (set of assingments
-// of legal variables to a single legal domain value each) violates
-// this constraint on the problem space or not.
-//
-// WORKAROUND for broken embedded struct + generics functionality :(
-type Satisfied[V, D comparable] func(Constraint[V], map[V]D) bool
+// checks if the given Constraint is satisfied by the current candidate solution
+type Satisfied[V comparable, D any] func(Constraint[V], map[V]D) bool
 
 // Problem models a single instance of a constraint-satisfaction problem.
-// Once instantiated and populated, this framework can produce a valid
-// solution, if one exists.
-type Problem[V, D comparable] struct {
+// Once instantiated and populated, it will brute-force a valid solution
+type Problem[V comparable, D any] struct {
 	Domain      map[V][]D
 	Constraints map[V][]Constraint[V]
 	SatFn       Satisfied[V, D]
 }
 
-func New[V, D comparable](domain map[V][]D, satFn Satisfied[V, D]) Problem[V, D] {
+// construct a Problem instance
+func New[V comparable, D any](domain map[V][]D, satFn Satisfied[V, D]) Problem[V, D] {
 	return Problem[V, D]{
 		Domain:      domain,
 		Constraints: map[V][]Constraint[V]{},
@@ -38,7 +28,7 @@ func New[V, D comparable](domain map[V][]D, satFn Satisfied[V, D]) Problem[V, D]
 	}
 }
 
-// apply another constraint to the problem space
+// apply another Constraint to filter candidate solutions
 func (p Problem[V, D]) AddConstraint(constraint Constraint[V]) {
 	for _, constraintVar := range constraint.Variables {
 		// ensure each constraint var is part of the problem space
@@ -58,10 +48,9 @@ func (p Problem[V, D]) AddConstraint(constraint Constraint[V]) {
 	}
 }
 
-// backtracking recursive search through the problem space, attempting
-// to fit a solution by testing one variable at a time through all
-// related constraints until all variables are assigned to a candidate
-// solution, meaning a complete, valid solution has been found.
+// backtracking recursive search through the domain of problem
+// variables and all their possible values. the first valid
+// solution obtained in this brute-force effort is returned
 func (p Problem[V, D]) Solve(assignment map[V]D) map[V]D {
 	// base case: all variables are assigned, a solution has been found
 	if len(assignment) == len(p.Domain) {
@@ -76,18 +65,21 @@ func (p Problem[V, D]) Solve(assignment map[V]D) map[V]D {
 		}
 	}
 
-	next := unassigned[0]
-	for _, acceptableValues := range p.Domain[next] {
-		// create a new candidate solution including the (novel)
-		// next unassigned value from the input assignment
-		candidate := dup(assignment)
-		candidate[next] = acceptableValues
-		// test if this augmented candidate assignment is still consistent
-		if p.consistent(next, candidate) {
-			result := p.Solve(candidate)
+	// test the current solution, augmented by the next
+	// unassigned variable and a candidate value, against
+	// all the constraints
+	nextVar := unassigned[0]
+	for _, candidateValue := range p.Domain[nextVar] {
+		assignment[nextVar] = candidateValue
+		if p.consistent(nextVar, assignment) {
+			result := p.Solve(assignment)
 			if result != nil {
 				return result
 			}
+		} else {
+			// the candidate value isn't a component of a
+			// valid solution; ditch it and keep trying
+			delete(assignment, nextVar)
 		}
 	}
 
@@ -107,7 +99,7 @@ func (p Problem[V, D]) consistent(variable V, assignment map[V]D) bool {
 }
 
 // utility: copy the current candidate solution into a new map
-func dup[V, D comparable](assignment map[V]D) map[V]D {
+func dup[V comparable, D any](assignment map[V]D) map[V]D {
 	out := make(map[V]D, len(assignment))
 
 	for k, v := range assignment {
