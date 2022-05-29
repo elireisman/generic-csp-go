@@ -8,7 +8,7 @@ import (
 	"github.com/elireisman/generic-csp-go/pkg/csp"
 )
 
-const GridSize = 12
+const GridSize = 16
 
 type Word string
 
@@ -30,8 +30,8 @@ type LetterColor string
 
 var (
 	None   LetterColor = "\x1b[0;0m"
-	Green  LetterColor = "\x1b[0;32m"
-	Yellow LetterColor = "\x1b[0;33m"
+	Green  LetterColor = "\x1b[1;42m"
+	Yellow LetterColor = "\x1b[1;41m"
 )
 
 var (
@@ -105,7 +105,7 @@ func NewWord(word Word) csp.Constraint[Word] {
 
 // check each existing placement in the candidate assingments for conflicts
 // with the new (proposed) placement named in the constraint
-func Satisfied[V Word, D Placement](wordConstraint csp.Constraint[Word], candidate map[Word]Placement) bool {
+func SatisfiesConstraint(wordConstraint csp.Constraint[Word], candidate map[Word]Placement) bool {
 	nextWord := wordConstraint.Variables[0]
 	nextPlacement := candidate[nextWord]
 
@@ -206,7 +206,7 @@ func renderGrid[V Word, D Placement](candidate map[Word]Placement) {
 	for row := 0; row < GridSize; row++ {
 		for col := 0; col < GridSize; col++ {
 			letter := puzzle[row][col]
-			fmt.Printf("%s%c%s", letter.Color, letter.Rune, None)
+			fmt.Printf("%s%c%s ", letter.Color, letter.Rune, None)
 		}
 		fmt.Println()
 	}
@@ -215,7 +215,7 @@ func renderGrid[V Word, D Placement](candidate map[Word]Placement) {
 // model puzzle the word placement problem using CSP framework + Go generics
 func main() {
 	// create CSP framework instance, populate
-	problem := csp.New(Placements, Satisfied[Word, Placement])
+	problem := csp.New(Placements, SatisfiesConstraint)
 	for _, wordToPlace := range Constraints {
 		problem.AddConstraint(wordToPlace)
 	}

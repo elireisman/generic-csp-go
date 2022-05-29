@@ -27,7 +27,7 @@ func NewBorder(us, them Province) csp.Constraint[Province] {
 
 // constraint: Ensure pair of province borders represented here
 // are not assigned the same color in the candidate solution
-func Satisfied[V, D comparable](border csp.Constraint[V], candidate map[V]D) bool {
+func SatisfiesConstraint(border csp.Constraint[Province], candidate map[Province]Color) bool {
 	colorP1, foundP1 := candidate[border.Variables[0]]
 	colorP2, foundP2 := candidate[border.Variables[1]]
 
@@ -90,6 +90,21 @@ func init() {
 	}
 }
 
+func printColor(c Color) string {
+	switch c {
+	case "Red":
+		return "\x1b[0;41m"
+	case "Blue":
+		return "\x1b[0;44m"
+	case "Yellow":
+		return "\x1b[0;43m"
+	case "Green":
+		return "\x1b[0;42m"
+	default:
+	}
+	panic(fmt.Sprintf("Unknown Color %s", c))
+}
+
 // model the map-coloring problem using CSP framework + Go generics
 func main() {
 	// assemble mapping of variables to a set of possible
@@ -100,7 +115,7 @@ func main() {
 	}
 
 	// create CSP framework instance, populate
-	problem := csp.New(domain, Satisfied[Province, Color])
+	problem := csp.New(domain, SatisfiesConstraint)
 	for _, border := range Constraints {
 		problem.AddConstraint(border)
 	}
@@ -112,7 +127,7 @@ func main() {
 	if result := problem.Solve(candidate); result != nil {
 		fmt.Println("Solution:")
 		for p, c := range result {
-			fmt.Printf("%s => %s\n", p, c)
+			fmt.Printf("%s%s\x1b[0;0m\n", printColor(c), p)
 		}
 		return
 	}

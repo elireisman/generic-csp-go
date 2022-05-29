@@ -27,7 +27,7 @@ func NewQueen(row Row) csp.Constraint[Row] {
 
 // constraint: ensure no newly-placed queen occupies a row and column
 // that can be threatened by any other already-placed queen
-func Satisfied[V Row, D Column](queen csp.Constraint[V], candidate map[V]D) bool {
+func SatisfiesConstraint(queen csp.Constraint[Row], candidate map[Row]Column) bool {
 	rowOccupied := queen.Variables[0]
 	colOccupied, found := candidate[rowOccupied]
 
@@ -49,7 +49,7 @@ func Satisfied[V Row, D Column](queen csp.Constraint[V], candidate map[V]D) bool
 		checkPosition(rowOccupied, colOccupied, candidate, -1, 1)
 }
 
-func checkPosition[V Row, D Column](qRow V, qCol D, queens map[V]D, diffRow V, diffCol D) bool {
+func checkPosition(qRow Row, qCol Column, queens map[Row]Column, diffRow Row, diffCol Column) bool {
 	qNextRow := qRow + diffRow
 	qNextCol := qCol + diffCol
 
@@ -104,6 +104,19 @@ func init() {
 	}
 }
 
+func renderBoard(result map[Row]Column) {
+	for row := 1; row <= 8; row++ {
+		for col := 1; col <= 8; col++ {
+			elem := "\x1b[0;38m.\x1b[0;0m"
+			if result[Row(row)] == Column(col) {
+				elem = "\x1b[0;46mQ\x1b[0;0m"
+			}
+			fmt.Printf("%s ", elem)
+		}
+		fmt.Println()
+	}
+}
+
 // model the 8 Queens problem using CSP framework + Go generics
 func main() {
 	// assemble mapping of variables to a set of possible
@@ -114,7 +127,7 @@ func main() {
 	}
 
 	// create CSP framework instance, populate
-	problem := csp.New(domain, Satisfied[Row, Column])
+	problem := csp.New(domain, SatisfiesConstraint)
 	for _, takeable := range Constraints {
 		problem.AddConstraint(takeable)
 	}
@@ -125,9 +138,7 @@ func main() {
 	// find ONE possible solution, and display it, if it exists
 	if result := problem.Solve(candidate); result != nil {
 		fmt.Println("Solution:")
-		for row, col := range result {
-			fmt.Printf("QUEEN: Row %d, Column %d\n", row, col)
-		}
+		renderBoard(result)
 		return
 	}
 
